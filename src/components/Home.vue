@@ -22,8 +22,7 @@
 </template>
 
 <script lang="ts">
-import { Component, Vue } from "vue-facing-decorator";
+import { defineComponent } from 'vue'
 
-@Component
-export default class Home extends Vue {}
+export default defineComponent({})
 </script>

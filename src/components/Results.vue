@@ -17,31 +17,49 @@
 </template>
 
 <script lang="ts">
-import { Component, Vue } from "vue-facing-decorator";
+import { defineComponent, onMounted, ref, watch } from 'vue'
 import * as ethers from "ethers";
 
-@Component
-export default class Vote extends Vue {
-  public options = [0, 0, 0, 0];
+export default defineComponent({
+  setup() {
+    const options = ref([0, 0, 0, 0]);
 
-  mounted() {
-    this.init();
-  }
-
-  async init() {
-    const abi = [
-      "function getOptionCounter(uint _option) external view returns (uint)",
-    ];
-    const provider = new ethers.providers.Web3Provider(
-      (window as any).ethereum
-    );
-    const signer = provider.getSigner();
-    const contracts = await (await fetch("contracts.json")).json();
-    const contract = new ethers.Contract(contracts.zktreevote, abi, signer);
-    for (let i = 0; i < 4; i++) {
-      this.options[i] = (await contract.getOptionCounter(i + 1)).toString();
+    const fetchResults = async () => {
+      console.log('Fetching results...');
+      try {
+        const abi = [
+          "function getOptionCounter(uint _option) external view returns (uint)",
+        ];
+        const provider = new ethers.providers.Web3Provider(
+          (window as any).ethereum
+        );
+        const signer = provider.getSigner();
+        const contracts = await (await fetch("contracts.json")).json();
+        console.log('Contracts:', contracts);
+        const contract = new ethers.Contract(contracts.zktreevote, abi, signer);
+        for (let i = 0; i < 4; i++) {
+          const optionCounter = await contract.getOptionCounter(i + 1);
+          console.log(`Option ${i + 1} count:`, optionCounter.toString());
+          options.value[i] = optionCounter.toString();
+        }
+        console.log('Final options:', options.value);
+      } catch (error) {
+        console.error('Error fetching results:', error);
+      }
     }
-    console.log(this.options[3]);
+    
+    onMounted(() => {
+      console.log('Component mounted');
+      fetchResults();
+    });
+
+    watch(options, (newOptions) => {
+      console.log('Options updated:', newOptions);
+    });
+    
+    return {
+      options,
+    }
   }
-}
+})
 </script>

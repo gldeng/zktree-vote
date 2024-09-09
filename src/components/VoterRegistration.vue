@@ -7,7 +7,7 @@
           <h1>Your commitment</h1>
           <img :src="qrcodeDataUrl" />
           <div
-            v-if="commitment"
+            v-if="commitment.commitment"
             v-html="splitTwoLines(commitment.commitment)"
           ></div>
           <button class="btn btn-info" @click="copyToClipboard">
@@ -24,49 +24,58 @@
 </template>
 
 <script lang="ts">
-import { Component, Vue } from "vue-facing-decorator";
+import { defineComponent, onMounted, ref, reactive } from 'vue'
 import { generateCommitment } from "zk-merkle-tree";
 import QRCode from "qrcode";
-import copyToClipboard from "copy-to-clipboard";
+import ctc from "copy-to-clipboard";
 
-@Component
-export default class VoterRegistration extends Vue {
-  public commitment: any = "";
-  public qrcodeDataUrl: string = "";
+export default defineComponent({
+  setup() {
+    const commitment = ref<{ commitment?: string }>({})
+    const qrcodeDataUrl = ref<string>("")
 
-  mounted() {
-    this.init();
-  }
+    const init = async () => {
+      const existingCommitment = localStorage.getItem("zktree-vote-commitment");
+      const commitmentNotGenerated = !existingCommitment || existingCommitment === "undefined";
+      
+      if (commitmentNotGenerated) {
+        commitment.value = await generateCommitment();
+        localStorage.setItem("zktree-vote-commitment", JSON.stringify(commitment.value));
+      } else {
+        commitment.value = JSON.parse(existingCommitment);
+      }
 
-  async init() {
-    this.commitment = JSON.parse(
-      localStorage.getItem("zktree-vote-commitment")
-    );
-    if (!this.commitment) {
-      this.commitment = await generateCommitment();
-      localStorage.setItem(
-        "zktree-vote-commitment",
-        JSON.stringify(this.commitment)
-      );
+      if (commitment.value.commitment) {
+        qrcodeDataUrl.value = await QRCode.toDataURL(commitment.value.commitment);
+      }
     }
-    this.qrcodeDataUrl = await QRCode.toDataURL(this.commitment.commitment);
-  }
 
-  splitTwoLines(text: string) {
-    const half = text.length / 2;
-    return (
-      text.substring(0, half) + "<br/>" + text.substring(half + 1, text.length)
-    );
-  }
+    onMounted(init)
 
-  public copyToClipboard() {
-    copyToClipboard(this.commitment.commitment);
-    alert("Successfully copied to the clipboard");
-  }
+    const splitTwoLines = (text: string) => {
+      const half = Math.floor(text.length / 2);
+      return text.substring(0, half) + "<br/>" + text.substring(half, text.length);
+    }
 
-  public resetCommitment() {
-    localStorage.removeItem("zktree-vote-commitment");
-    this.init();
+    const copyToClipboard = () => {
+      if (commitment.value.commitment) {
+        ctc(commitment.value.commitment);
+        alert("Successfully copied to the clipboard");
+      }
+    }
+
+    const resetCommitment = () => {
+      localStorage.removeItem("zktree-vote-commitment");
+      init();
+    }
+
+    return {
+      commitment,
+      splitTwoLines,
+      copyToClipboard,
+      resetCommitment,
+      qrcodeDataUrl,
+    }
   }
-}
+})
 </script>
